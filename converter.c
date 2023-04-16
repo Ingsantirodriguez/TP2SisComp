@@ -3,6 +3,52 @@
 #include <curl/curl.h>
 #include "lib/cJSON.h"
 
+int get_value(char *url)
+{
+  CURL *curl;
+  CURLcode res;
+  struct curl_slist *headers = NULL;
+  FILE *fp;
+
+  curl = curl_easy_init();
+  if (curl)
+  {
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    headers = curl_slist_append(headers, "accept: application/json");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    /* Set the option to receive data in a callback */
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+
+    /* Open the file for writing */
+    fp = fopen("output.json", "w");
+
+    /* Set the file as the write target */
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+
+    /* Perform the request */
+    res = curl_easy_perform(curl);
+
+    /* Close the file */
+    fclose(fp);
+
+    /* Check for errors */
+    if (res != CURLE_OK)
+    {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+      return 1;
+    }
+
+    /* Cleanup */
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+    return 0;
+  }
+  printf("Error en CURL init\n");
+  return 1;
+}
+
 double read_output()
 {
   double ars_value = 0;
@@ -43,13 +89,19 @@ double read_output()
   if (cJSON_IsNumber(ars_obj))
   {
     ars_value = ars_obj->valuedouble;
-    printf("El valor en $ARS es: $%.0f\n", ars_value);
   }
   else
   {
-    fprintf(stderr, "Error getting \"ars\" value from JSON\n");
-    free(json_str);
-    return 1;
+    cJSON *ars_obj = cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItem(root, "monero"), "ars");
+    if (cJSON_IsNumber(ars_obj))
+    {
+      ars_value = ars_obj->valuedouble;
+    }
+    else
+    {
+      fprintf(stderr, "Error getting \"ars\" value from JSON\n");
+      return 0;
+    }
   }
 
   // Clean up
@@ -61,47 +113,25 @@ double read_output()
 
 int main(void)
 {
-  CURL *curl;
-  CURLcode res;
-  struct curl_slist *headers = NULL;
-  FILE *fp;
+  char *url_bitcoin = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars";
+  char *url_monero = "https://api.coingecko.com/api/v3/simple/price?ids=monero&vs_currencies=ars";
 
-  char *url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars";
-
-  curl = curl_easy_init();
-  if (curl)
+  if (get_value(url_bitcoin))
   {
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    headers = curl_slist_append(headers, "accept: application/json");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    return (1);
+  }
+  double bitcoin_in_ars = read_output(); // Valor en $ARS de un bitcoin
+  if (get_value(url_monero))
+  {
+    return (1);
+  }
+  double monero_in_ars = read_output(); // Valor en $ARS de un monero
 
-    /* Set the option to receive data in a callback */
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
-
-    /* Open the file for writing */
-    fp = fopen("output.json", "w");
-
-    /* Set the file as the write target */
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-
-    /* Perform the request */
-    res = curl_easy_perform(curl);
-
-    /* Close the file */
-    fclose(fp);
-
-    /* Check for errors */
-    if (res != CURLE_OK)
-      fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(res));
-
-    /* Cleanup */
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
+  if (bitcoin_in_ars == 0 || monero_in_ars == 0)
+  {
+    return 1;
   }
 
-  double value_in_ars = read_output(); // Valor en $ARS de un bitcoin
-
+  printf("Valor de 1 BTC en $ARS = %1.0f\nValor de 1 XMR en $ARS = %1.0f\n", bitcoin_in_ars, monero_in_ars);
   return 0;
 }
