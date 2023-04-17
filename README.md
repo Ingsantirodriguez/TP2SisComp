@@ -28,7 +28,7 @@ Ingrese la criptomoneda:
  2. Monero
  3. Ethereum
  2
-Valor de 1 XMR en USD = $161
-Valor de 1 XMR en ARS = $34776
-Valor de 1 XMR en EUR = $146
+Valor de 1 XMR en USD = 161
+Valor de 1 XMR en ARS = 34776
+Valor de 1 XMR en EUR = 146
 ```

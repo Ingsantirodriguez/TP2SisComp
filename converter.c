@@ -20,7 +20,7 @@ int get_value(char *url)
   struct curl_slist *headers = NULL;
   FILE *fp;
 
-  curl = curl_easy_init(); // Inicializa la estructura curl que contiene
+  curl = curl_easy_init();curl = curl_easy_init();curl = curl_easy_init(); // Inicializa la estructura curl que contiene
                            // información sobre la transferencia como el url
                            // y que hacer una vez que se obtiene la respuesta.
   if (curl)
@@ -65,7 +65,7 @@ int get_value(char *url)
 int read_output(char *coin)
 {
   int usd_value = 0;
-  // Open the file for reading
+  // Abre el archivo para lectura
   FILE *fp = fopen("output.json", "r");
   if (fp == NULL)
   {
@@ -73,7 +73,7 @@ int read_output(char *coin)
     return 0;
   }
 
-  // Read the contents of the file into a string
+  // Lee los contenidos del archivo y los guarda en un string
   fseek(fp, 0, SEEK_END);
   long file_size = ftell(fp);             // Junto con fseek determinan el tamaño del archivo
   rewind(fp);                             // Se retorna fp a su valor inicial
@@ -88,7 +88,6 @@ int read_output(char *coin)
   json_str[file_size] = '\0';        // Se coloca un NULL como último caracter
   fclose(fp);                        // Se cierra el archivo
 
-  // Parse the JSON string
   cJSON *root = cJSON_Parse(json_str); // Guarda el string en formato cjson
   if (root == NULL)
   {
@@ -97,7 +96,6 @@ int read_output(char *coin)
     return 0;
   }
 
-  // Extract the "ars" value from the JSON object
   cJSON *usd_obj = cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItem(root, coin), "usd"); // Extrae el valor del precio de la cripto en dolares
   if (cJSON_IsNumber(usd_obj))                                                               // Si el valor es un numero
   {
@@ -124,9 +122,9 @@ void print_values(int value_in_usd, char *coin_name)
   int value_in_ars = convert(value_in_usd, (int)(USD_ARS * 100));
   int value_in_eur = convert(value_in_usd, (int)(USD_EUR * 100));
 
-  printf("Valor de 1 %s en $USD = $%d\n", coin_name, value_in_usd);
-  printf("Valor de 1 %s en ARS = $%d\n", coin_name, value_in_ars);
-  printf("Valor de 1 %s en EUR = $%d\n", coin_name, value_in_eur);
+  printf("Valor de 1 %s en USD = %d\n", coin_name, value_in_usd);
+  printf("Valor de 1 %s en ARS = %d\n", coin_name, value_in_ars);
+  printf("Valor de 1 %s en EUR = %d\n", coin_name, value_in_eur);
 }
 
 int main(void)
