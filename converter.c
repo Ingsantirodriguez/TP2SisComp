@@ -4,6 +4,8 @@
 #include <curl/curl.h>
 #include "lib/cJSON.h"
 
+extern int convert(int a, int b);
+
 /**
  * @brief Guarda en el archivo output.json la respuesta de la llamada a la API
  *
@@ -18,40 +20,35 @@ int get_value(char *url)
   struct curl_slist *headers = NULL;
   FILE *fp;
 
-  curl = curl_easy_init();
+  curl = curl_easy_init(); // Inicializa la estructura curl que contiene
+                           // información sobre la transferencia como el url
+                           // y que hacer una vez que se obtiene la respuesta.
   if (curl)
   {
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    headers = curl_slist_append(headers, "accept: application/json");
+    curl_easy_setopt(curl, CURLOPT_URL, url);                         // Se asigna el url
+    headers = curl_slist_append(headers, "accept: application/json"); // header que pide la API
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); // Si el link redirige sigue la redirección
 
-    /* Set the option to receive data in a callback */
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite); // Opción para escribir los datos en el archivo
 
-    /* Open the file for writing */
-    fp = fopen("output.json", "w");
+    fp = fopen("output.json", "w"); // Abre el archivo para escritura
 
-    /* Set the file as the write target */
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp); // Selecciona el archivo sobre el que se va a escribir
 
-    /* Perform the request */
-    res = curl_easy_perform(curl);
+    res = curl_easy_perform(curl); // Hace la llamada a la api y la escritura
 
-    /* Close the file */
-    fclose(fp);
+    fclose(fp); // Cierra el archivo
 
-    /* Check for errors */
-    if (res != CURLE_OK)
+    if (res != CURLE_OK) // Si res = resultado funcionó, salta
     {
       fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
       return 1;
     }
 
-    /* Cleanup */
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-    return 0;
+    curl_slist_free_all(headers); // Elimina el header pedido por la api
+    curl_easy_cleanup(curl);      // Limpia la estructura curl
+    return 0;                     // Retorna cero indicando éxito
   }
   printf("Error en CURL init\n");
   return 1;
@@ -62,12 +59,12 @@ int get_value(char *url)
  * en $ARS.
  *
  * @param coin nombre de la moneda
- * @return double valor de la criptomoneda en $ARS
+ * @return int valor de la criptomoneda en $ARS
  */
 
-double read_output(char *coin)
+int read_output(char *coin)
 {
-  double ars_value = 0;
+  int usd_value = 0;
   // Open the file for reading
   FILE *fp = fopen("output.json", "r");
   if (fp == NULL)
@@ -78,21 +75,21 @@ double read_output(char *coin)
 
   // Read the contents of the file into a string
   fseek(fp, 0, SEEK_END);
-  long file_size = ftell(fp);
-  rewind(fp);
-  char *json_str = malloc(file_size + 1);
+  long file_size = ftell(fp);             // Junto con fseek determinan el tamaño del archivo
+  rewind(fp);                             // Se retorna fp a su valor inicial
+  char *json_str = malloc(file_size + 1); // Creo un string de tamaño del archivo + 1
   if (json_str == NULL)
   {
     fprintf(stderr, "Error allocating memory\n");
     free(json_str);
     return 0;
   }
-  fread(json_str, 1, file_size, fp);
-  json_str[file_size] = '\0';
-  fclose(fp);
+  fread(json_str, 1, file_size, fp); // Se lee el archivo de a un byte y se lo guarda en el string
+  json_str[file_size] = '\0';        // Se coloca un NULL como último caracter
+  fclose(fp);                        // Se cierra el archivo
 
   // Parse the JSON string
-  cJSON *root = cJSON_Parse(json_str);
+  cJSON *root = cJSON_Parse(json_str); // Guarda el string en formato cjson
   if (root == NULL)
   {
     fprintf(stderr, "Error parsing JSON: %s\n", cJSON_GetErrorPtr());
@@ -101,79 +98,84 @@ double read_output(char *coin)
   }
 
   // Extract the "ars" value from the JSON object
-  cJSON *ars_obj = cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItem(root, coin), "ars");
-  if (cJSON_IsNumber(ars_obj))
+  cJSON *usd_obj = cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItem(root, coin), "usd"); // Extrae el valor del precio de la cripto en dolares
+  if (cJSON_IsNumber(usd_obj))                                                               // Si el valor es un numero
   {
-    ars_value = ars_obj->valuedouble;
+    usd_value = usd_obj->valueint; // lo guarda en la variable a retornar
   }
   else
   {
-    fprintf(stderr, "Error getting \"ars\" value from JSON\n");
+    fprintf(stderr, "Error getting \"usd\" value from JSON\n");
     return 0;
   }
 
-  // Clean up
-  cJSON_Delete(root);
-  free(json_str);
+  cJSON_Delete(root); // Elimina el cjson creado
+  free(json_str);     // Libera el espacio de memoria ocupaso por el string
 
-  return ars_value;
+  return usd_value;
+}
+
+void print_values(int value_in_usd, char *coin_name)
+{
+  double USD_ARS = 216;
+  double USD_EUR = 0.91;
+
+  // Multiplica los valores por 100 para no tener decimales
+  int value_in_ars = convert(value_in_usd, (int)(USD_ARS * 100));
+  int value_in_eur = convert(value_in_usd, (int)(USD_EUR * 100));
+
+  printf("Valor de 1 %s en $USD = $%d\n", coin_name, value_in_usd);
+  printf("Valor de 1 %s en ARS = $%d\n", coin_name, value_in_ars);
+  printf("Valor de 1 %s en EUR = $%d\n", coin_name, value_in_eur);
 }
 
 int main(void)
 {
-  char *url_bitcoin = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=ars";
-  char *url_monero = "https://api.coingecko.com/api/v3/simple/price?ids=monero&vs_currencies=ars";
-  char *url_ethereum = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=ars";
+  char *url_bitcoin = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
+  char *url_monero = "https://api.coingecko.com/api/v3/simple/price?ids=monero&vs_currencies=usd";
+  char *url_ethereum = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd";
 
   int coin_id;
-  char coin_name[32];
-  double value_in_ars;
+  int value_in_usd;
 
   while (1)
   {
     printf("Ingrese la criptomoneda:\n 1. Bitcoin\n 2. Monero\n 3. Ethereum\n");
-    scanf("%d", &coin_id);
+    scanf("%d", &coin_id); // Pide la moneda a ingresar
 
     switch (coin_id)
     {
     case 1:
-      if (get_value(url_bitcoin))
-      {
-        return (1);
-      }
-      value_in_ars = read_output("bitcoin"); // Valor en $ARS de un bitcoin
-      strcpy(coin_name, "BTC");
+      if (get_value(url_bitcoin))  // Llamada a la api
+        return 1;
+      value_in_usd = read_output("bitcoin"); // Valor en $ARS de un bitcoin
+      if (value_in_usd == 0)
+        return 1;
+      print_values(value_in_usd, "BTC");
       break;
 
     case 2:
-      if (get_value(url_monero))
-      {
-        return (1);
-      }
-      value_in_ars = read_output("monero"); // Valor en $ARS de un monero
-      strcpy(coin_name, "XMR");
+      if (get_value(url_monero))  // Llamada a la api
+        return 1;
+      value_in_usd = read_output("monero"); // Valor en $ARS de un monero
+      if (value_in_usd == 0)
+        return 1;
+      print_values(value_in_usd, "XMR");
       break;
 
     case 3:
-      if (get_value(url_ethereum))
-      {
-        return (1);
-      }
-      value_in_ars = read_output("ethereum"); // Valor en $ARS de un ether
-      strcpy(coin_name, "ETH");
+      if (get_value(url_ethereum))  // Llamada a la api
+        return 1;
+      value_in_usd = read_output("ethereum"); // Valor en $ARS de un ether
+      if (value_in_usd == 0)
+        return 1;
+      print_values(value_in_usd, "ETH");
       break;
 
     default:
       printf("El valor ingresado no corresponde con ninguna criptomoneda\n");
       break;
     }
-
-    if (value_in_ars == 0)
-    {
-      return 1;
-    }
-
-    printf("Valor de 1 %s en $ARS = %1.0f\n", coin_name, value_in_ars);
   }
 
   return 0;
